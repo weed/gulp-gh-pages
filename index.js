@@ -12,12 +12,15 @@ var PluginError = gutil.PluginError;
 /*
  * Public: Push to gh-pages branch for github
  *
- * options - {Object} that contains all the options of the plugin
- *   - remoteUrl: The {String} remote url (github repository) of the project,
- *   - origin: The {String} origin of the git repository (default to `"origin"`),
- *   - branch: The {String} branch where deploy will by done (default to `"gh-pages"`),
- *   - cacheDir: {String} where the git repo will be located. (default to a temporary folder)
- *   - push: {Boolean} to know whether or not the branch should be pushed (default to `true`)
+ * @param options {String} - Remote url (github repository) of the project,
+ * @param remote {String|'origin'}
+ *
+ * @param options - {Object} that contains all the options of the plugin
+ *  @param options.remoteUrl {String} - remote url (github repository) of the project,
+ *  @param options.origin {String|'origin'} - rigin of the git repository (default to `"origin"`),
+ *  @param options.branch {String} - branch where deploy will by done (default to `"gh-pages"`),
+ *  @param options.cacheDir {String} - where the git repo will be located. (default to a temporary folder)
+ *  @param options.push {Boolean|true} - to know whether or not the branch should be pushed
  *
  * Returns `Stream`.
 **/
@@ -51,6 +54,20 @@ module.exports = function (options, remote) {
 		callback();
 	}
 
+	/*
+	 * Main task performing a series of git operations.
+	 * The scope of this plugin is to automatically deploy contents of a dist
+	 * folder to the `gh-pags` branch.
+	 *
+	 * 1. Clone repo (if not present)
+	 * 2. Checkout `gh-pages` branch (create if necessary)
+	 * 3. Update contents of repo with `git pull
+	 * 4. Remove all files from repo
+	 * 5. Copy files from `dist` directory to repo
+	 * 6. Stage files `git add`
+	 * 7. Commit
+	 * 8. Push
+	**/
 	function task (callback) {
 		if (filePaths.length === 0) return callback();
 		return git.prepareRepo(remoteUrl, cacheDir)
@@ -65,7 +82,7 @@ module.exports = function (options, remote) {
 				return repo.checkoutBranch(branch);
 			} else {
 				gutil.log(TAG + 'Create branch `' + branch + '` and checkout');
-				return repo.createAndCheckoutBranch(branch)
+				return repo.createAndCheckoutBranch(branch);
 			}
 		})
 		.then(function (repo) {
@@ -73,15 +90,7 @@ module.exports = function (options, remote) {
 			// updating to avoid having local cache not up to date
 			if (cacheDir) {
 				gutil.log(TAG + 'Updating repository');
-				repo._repo.git("pull", function(err) {
-					if (err) {
-						deferred.reject(err);
-						throw new Error(err);
-					}
-					else {
-						deferred.resolve(repo);
-					}
-				})
+				return repo.pull();
 			}
 			// no cache, skip this step
 			else {
